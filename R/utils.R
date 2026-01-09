@@ -77,9 +77,9 @@ plot_corr_heatmap <- function(sgcount, df_design, cor_method = "pearson") {
     sgcount[,cols] %>% cor(method = cor_method) %>% 
         pheatmap::pheatmap(display_numbers = T, 
                            number_format = "%.2f", 
-                           annotation_col = df_design %>% 
-                               tibble::column_to_rownames("sample_name") %>% 
-                               dplyr::select_("group"))    
+                           annotation_col = df_design %>%
+                               tibble::column_to_rownames("sample_name") %>%
+                               dplyr::select(dplyr::all_of("group")))    
 }
 
 #' A function to calculate the mappabilities of each NGS sample.
@@ -111,11 +111,11 @@ plot_corr_heatmap <- function(sgcount, df_design, cor_method = "pearson") {
 calc_mappability <- function(count_obj, df_design) {
     csum <- count_obj$count %>% colSums()
     mp <- csum/count_obj$total * 100
-    df_design %>% 
-        dplyr::mutate_(total_reads = ~count_obj$total) %>% 
-        dplyr::mutate_(mapped_reads = ~csum) %>% 
-        dplyr::mutate_(mappability = ~mp) %>% 
-        dplyr::select_(.dots = c("-fastq_path"))
+    df_design %>%
+        dplyr::mutate(total_reads = count_obj$total) %>%
+        dplyr::mutate(mapped_reads = csum) %>%
+        dplyr::mutate(mappability = mp) %>%
+        dplyr::select(-dplyr::any_of("fastq_path"))
 }
 
 #' A function to join a count table and a design table.
@@ -136,17 +136,19 @@ join_count_and_design <- function(sgcount, df_design) {
     cols <- colnames(sgcount)
     
     if(all(sapply(sgcount, class) == "numeric")) {
-        sgcount %>% as.data.frame(stringsAsFactors=F) %>% 
-            tibble::rownames_to_column("sgRNA") %>% 
-            tidyr::gather_(key_col = "sample_name", value_col = "count", 
-                           gather_cols = cols) %>% 
-            dplyr::left_join(df_design, by = "sample_name") 
+        sgcount %>% as.data.frame(stringsAsFactors=F) %>%
+            tibble::rownames_to_column("sgRNA") %>%
+            tidyr::pivot_longer(cols = dplyr::all_of(cols),
+                                names_to = "sample_name",
+                                values_to = "count") %>%
+            dplyr::left_join(df_design, by = "sample_name")
     } else {
         cols <- colnames(sgcount)[sapply(sgcount, class) == "numeric"]
-        sgcount %>% as.data.frame(stringsAsFactors=F) %>% 
-            tidyr::gather_(key_col = "sample_name", value_col = "count", 
-                           gather_cols = cols) %>% 
-            dplyr::left_join(df_design, by = "sample_name") 
+        sgcount %>% as.data.frame(stringsAsFactors=F) %>%
+            tidyr::pivot_longer(cols = dplyr::all_of(cols),
+                                names_to = "sample_name",
+                                values_to = "count") %>%
+            dplyr::left_join(df_design, by = "sample_name")
     }
 }
 
@@ -166,8 +168,8 @@ join_count_and_design <- function(sgcount, df_design) {
 #' 
 #' @export
 plot_count_distribution <- function(sgcount, df_design, add_dots = FALSE) {
-    p <- join_count_and_design(sgcount, df_design) %>% 
-        dplyr::mutate_(count = ~ log2(1+count)) %>% 
+    p <- join_count_and_design(sgcount, df_design) %>%
+        dplyr::mutate(count = log2(1+count)) %>% 
         ggplot2::ggplot(ggplot2::aes_string(y="count", x="sample_name")) + 
         ggplot2::geom_violin(ggplot2::aes_string(fill = "group")) + 
         ggplot2::ylab("log2(1+count)")
@@ -201,8 +203,8 @@ plot_dotplot <- function(sgcount, df_design, gene, ge_id = NULL, sg_id = NULL) {
             stop(glue::glue("{gene} is not in sgcount."))
         }
         
-        join_count_and_design(sgcount, df_design) %>% 
-            dplyr::filter_(~stringr::str_detect(sgRNA, glue::glue("^{gene}"))) %>% 
+        join_count_and_design(sgcount, df_design) %>%
+            dplyr::filter(stringr::str_detect(.data$sgRNA, glue::glue("^{gene}"))) %>% 
             ggplot2::ggplot(ggplot2::aes_string(x = "group", y = "count")) + 
             ggplot2::geom_dotplot(ggplot2::aes_string(fill = "group", color = "group"), binaxis = "y", stackdir = "center", stackratio = 1.5, dotsize = 1.2) + 
             ggplot2::facet_wrap(~sgRNA, scales = "free_y") + ggplot2::ggtitle(gene)
