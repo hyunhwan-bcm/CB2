@@ -1,7 +1,7 @@
 Package: CB2
 Type: Package
 Title: CRISPR Pooled Screen Analysis using Beta-Binomial Test
-Version: 1.3.6
+Version: 1.3.7
 Date: 2025-10-01
 Authors@R: 
   c(person(given = "Hyun-Hwan", family = "Jeong", role = c("aut", "cre"), email = "hyunhwanjeong@icloud.com"))
