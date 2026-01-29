@@ -1,8 +1,8 @@
 Package: CB2
 Type: Package
 Title: CRISPR Pooled Screen Analysis using Beta-Binomial Test
-Version: 1.3.7
-Date: 2025-10-01
+Version: 1.3.8
+Date: 2026-01-29
 Authors@R: 
   c(person(given = "Hyun-Hwan", family = "Jeong", role = c("aut", "cre"), email = "hyunhwanjeong@icloud.com"))
 Description: Provides functions for hit gene identification and quantification of sgRNA (single-guided RNA) abundances for CRISPR (Clustered Regularly Interspaced Short Palindromic Repeats) pooled screen data analysis. 
