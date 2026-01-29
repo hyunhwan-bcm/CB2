@@ -9,3 +9,8 @@ src/*.tmp
 *.DS_Store
 **/*.DS_Store
 .idea
+.Rprofile
+.claude/
+CB2.Rcheck/
+renv.lock
+renv/
