@@ -9,6 +9,10 @@ We provide CB<sup>2</sup> as a R package, and the interal algorithms of CB<sup>2
 
 ## Update
 
+### Jan 29, 2026
+
+Replace deprecated dplyr underscore functions with modern equivalents for compatibility with recent dplyr versions. Thanks @DavisVaughan for the contribution.
+
 ### Oct 1, 2025
 
 Update the C++ dependency 
