@@ -18,6 +18,15 @@ beta-binomial treatment of sequencing and between-library variation while
 replacing the group comparison with an R model matrix. Existing two-group
 functions are unchanged.
 
+The relationship is methodological, not a claim that the two functions are
+numerically identical. Original CB<sup>2</sup> is exactly representable as a
+binary-design generalized least-squares contrast of its weighted group
+proportions. The default logit-scale regression statistic is first-order
+equivalent under local alternatives, but finite-sample results can differ
+because CB<sup>2</sup> estimates group-specific weights and uses
+Welch–Satterthwaite degrees of freedom, while `bbreg()` uses one guide-wise
+dispersion across the design and residual sample degrees of freedom.
+
 Use CB<sup>2</sup>-Reg for dose, time, ordered phenotypes, batch or donor
 adjustment, interactions, and named contrasts:
 

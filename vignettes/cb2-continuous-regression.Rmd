@@ -22,13 +22,30 @@ What changes is the mean model: a standard R formula can contain a continuous
 sample phenotype, adjustment variables, interactions, splines, or categorical
 contrasts.
 
+This is a precise statistical extension rather than an assertion that the
+default functions return the same number. If the original weighted group
+proportions are written as \(\widehat p_A\) and \(\widehat p_B\), with
+estimated variances \(V_A\) and \(V_B\), then a binary-design generalized
+least-squares model has coefficient vector
+\[
+(\widehat p_A,\widehat p_B-\widehat p_A)^\top
+\]
+and slope variance \(V_A+V_B\). Its slope t statistic is therefore exactly the
+original CB2 statistic. On the logit scale, Taylor expansion around
+\(p_A=p_B=p\) multiplies both the effect and standard error by
+\(\{p(1-p)\}^{-1}\), which cancels. Thus the logit statistic is first-order
+equivalent under local alternatives. In finite samples the estimators differ:
+original CB2 uses separate group weighting and Welch-style degrees of freedom;
+`bbreg()` estimates one guide-wise dispersion across the entire design and
+uses residual sample degrees of freedom.
+
 | Feature | Original CB2 | CB2-Reg |
 |---|---|---|
 | Design | Two group labels | Full-rank R model matrix |
 | Effect | Group difference | Conditional log-odds coefficient or contrast |
 | Covariates | Pairwise design | Dose, time, batch, donor, interactions |
-| Variance | Beta-binomial | Same beta-binomial principle |
-| Inference | Two-group test | Student t with sample-level residual df |
+| Dispersion | Group-specific weighting | One guide-wise rho across the design |
+| Inference | Welch-style two-group test | Student t with residual sample df |
 
 ## Simulated dose-response screen
 

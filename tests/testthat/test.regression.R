@@ -52,6 +52,33 @@ test_that("Rcpp weighted products agree with base R", {
   )
 })
 
+test_that("original CB2 is exactly a binary-design GLS contrast", {
+  count_a <- matrix(c(74, 112, 91, 139), nrow = 1)
+  total_a <- matrix(c(52000, 81000, 69000, 97000), nrow = 1)
+  count_b <- matrix(c(128, 177, 164, 211), nrow = 1)
+  total_b <- matrix(c(55000, 76000, 72000, 93000), nrow = 1)
+  fit_a <- fit_ab(count_a, total_a)
+  fit_b <- fit_ab(count_b, total_b)
+  phat <- c(fit_a$phat, fit_b$phat)
+  vhat <- c(fit_a$vhat, fit_b$vhat)
+
+  x <- cbind(1, c(0, 1))
+  gls <- getFromNamespace("bb_wls_solve_cpp", "CB2")(
+    x, 1 / vhat, phat, covariance = TRUE
+  )
+  beta <- drop(gls$coefficient)
+  covariance <- gls$covariance
+  original_t <- diff(phat) / sqrt(sum(vhat))
+
+  expect_equal(beta, c(phat[1], diff(phat)), tolerance = 1e-12)
+  expect_equal(covariance[2, 2], sum(vhat), tolerance = 1e-12)
+  expect_equal(
+    beta[2] / sqrt(covariance[2, 2]),
+    original_t,
+    tolerance = 1e-12
+  )
+})
+
 test_that("bb_screen preserves guide and gene annotation", {
   counts <- rbind(
     sg1 = count,
