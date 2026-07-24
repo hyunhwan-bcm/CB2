@@ -11,6 +11,33 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// bb_wls_system_cpp
+Rcpp::List bb_wls_system_cpp(const arma::mat& x, const arma::vec& weight, const arma::vec& response);
+RcppExport SEXP _CB2_bb_wls_system_cpp(SEXP xSEXP, SEXP weightSEXP, SEXP responseSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type weight(weightSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type response(responseSEXP);
+    rcpp_result_gen = Rcpp::wrap(bb_wls_system_cpp(x, weight, response));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bb_wls_solve_cpp
+Rcpp::List bb_wls_solve_cpp(const arma::mat& x, const arma::vec& weight, const arma::vec& response, const bool covariance);
+RcppExport SEXP _CB2_bb_wls_solve_cpp(SEXP xSEXP, SEXP weightSEXP, SEXP responseSEXP, SEXP covarianceSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type weight(weightSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type response(responseSEXP);
+    Rcpp::traits::input_parameter< const bool >::type covariance(covarianceSEXP);
+    rcpp_result_gen = Rcpp::wrap(bb_wls_solve_cpp(x, weight, response, covariance));
+    return rcpp_result_gen;
+END_RCPP
+}
 // quant
 Rcpp::List quant(std::string ref_path, std::vector<std::string> fastq_path, bool verbose);
 RcppExport SEXP _CB2_quant(SEXP ref_pathSEXP, SEXP fastq_pathSEXP, SEXP verboseSEXP) {
@@ -38,6 +65,8 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_CB2_bb_wls_system_cpp", (DL_FUNC) &_CB2_bb_wls_system_cpp, 3},
+    {"_CB2_bb_wls_solve_cpp", (DL_FUNC) &_CB2_bb_wls_solve_cpp, 4},
     {"_CB2_quant", (DL_FUNC) &_CB2_quant, 3},
     {"_CB2_fit_ab", (DL_FUNC) &_CB2_fit_ab, 2},
     {NULL, NULL, 0}

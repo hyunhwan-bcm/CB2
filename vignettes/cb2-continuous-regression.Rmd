@@ -1,0 +1,109 @@
+---
+title: "Continuous and multivariable phenotypes in CB2"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Continuous and multivariable phenotypes in CB2}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+CB2's original `measure_sgrna_stats()` answers a two-group question. CB2-Reg
+answers a coefficient question: does guide abundance change with dose, time,
+an ordered phenotype, or an adjusted treatment effect?
+
+The regression interface is additive and does not change the original
+workflow. It keeps guide count as the response and retains CB2's
+beta-binomial treatment of library depth and between-sample heterogeneity.
+What changes is the mean model: a standard R formula can contain a continuous
+sample phenotype, adjustment variables, interactions, splines, or categorical
+contrasts.
+
+| Feature | Original CB2 | CB2-Reg |
+|---|---|---|
+| Design | Two group labels | Full-rank R model matrix |
+| Effect | Group difference | Conditional log-odds coefficient or contrast |
+| Covariates | Pairwise design | Dose, time, batch, donor, interactions |
+| Variance | Beta-binomial | Same beta-binomial principle |
+| Inference | Two-group test | Student t with sample-level residual df |
+
+## Simulated dose-response screen
+
+```{r}
+library(CB2)
+
+set.seed(20260723)
+design <- data.frame(
+  sample_name = sprintf("sample_%02d", 1:18),
+  dose = rep(seq(-1.5, 1.5, length.out = 6), 3),
+  batch = factor(rep(letters[1:3], each = 6))
+)
+totals <- round(runif(nrow(design), 40000, 90000))
+
+simulate_guide <- function(intercept, slope, rho = 0.0015) {
+  mu <- plogis(intercept + slope * design$dose)
+  precision <- 1 / rho - 1
+  p <- rbeta(length(mu), mu * precision, (1 - mu) * precision)
+  rbinom(length(mu), totals, p)
+}
+
+counts <- rbind(
+  geneA_sg1 = simulate_guide(-7.0, 0.9),
+  geneA_sg2 = simulate_guide(-6.8, 0.8),
+  geneB_sg1 = simulate_guide(-7.1, 0),
+  geneB_sg2 = simulate_guide(-6.9, 0)
+)
+```
+
+Fit one guide with beta-binomial regression:
+
+```{r}
+fit <- bbreg(
+  count = counts[1, ],
+  total = totals,
+  formula = ~ scale(dose) + batch,
+  data = design
+)
+summary(fit)
+bb_contrast(fit, c("scale(dose)" = 1))
+```
+
+Or analyze every guide and apply Benjamini-Hochberg correction:
+
+```{r}
+bb_result <- bb_screen(
+  counts = counts,
+  totals = totals,
+  data = design,
+  formula = ~ scale(dose) + batch,
+  term = "scale(dose)",
+  gene = sub("_sg[0-9]+$", "", rownames(counts))
+)
+bb_result
+```
+
+If the library contains at least 20 prespecified negative-control guides, use
+them to diagnose and, when necessary, scale an inflated t-statistic tail:
+
+```{r, eval=FALSE}
+bb_result <- bb_calibrate_controls(
+  bb_result,
+  control = guide_annotation$gene == "Non-Targeting Control"
+)
+attr(bb_result, "control_scale")
+```
+
+The function matches the empirical 95th percentile of absolute control t
+statistics to the corresponding Student t cutoff. It never reduces the
+standard errors by default, and retains the original inferential columns with
+a `raw_` prefix. This is a calibration tool, not a substitute for a repeated-
+measure or joint multinomial model when libraries are correlated.
+
+The coefficient is a log-odds change per predictor unit. Its t reference has
+sample-level residual degrees of freedom; read depth does not substitute for
+biological replication. For a negative-binomial benchmark, run the official
+MAGeCK-MLE tool separately with the same sample design rather than embedding a
+partial MAGeCK reimplementation inside CB2.

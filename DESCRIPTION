@@ -1,12 +1,19 @@
 Package: CB2
 Type: Package
-Title: CRISPR Pooled Screen Analysis using Beta-Binomial Test
-Version: 1.3.6
-Date: 2025-10-01
+Title: Beta-Binomial Tests and Regression for CRISPR Pooled Screens
+Version: 1.4.0
+Date: 2026-07-23
 Authors@R: 
   c(person(given = "Hyun-Hwan", family = "Jeong", role = c("aut", "cre"), email = "hyunhwanjeong@icloud.com"))
-Description: Provides functions for hit gene identification and quantification of sgRNA (single-guided RNA) abundances for CRISPR (Clustered Regularly Interspaced Short Palindromic Repeats) pooled screen data analysis. 
-  Details are in Jeong et al. (2019) <doi:10.1101/gr.245571.118> and Baggerly et al. (2003) <doi:10.1093/bioinformatics/btg173>. 
+Description: Provides functions for hit gene identification and quantification
+  of sgRNA (single-guide RNA) abundances in pooled CRISPR screens. In addition
+  to the original two-group beta-binomial test, the package provides
+  design-matrix beta-binomial regression with Student t inference for
+  quantitative, ordered, or multivariable sample phenotypes. The regression
+  layer supports covariate adjustment, interactions, and linear contrasts
+  without changing the original workflow. Details of the original method are in Jeong
+  et al. (2019) <doi:10.1101/gr.245571.118> and Baggerly et al. (2003)
+  <doi:10.1093/bioinformatics/btg173>.
 Depends: R (>= 3.5.0)
 License: MIT + file LICENSE
 LazyData: true

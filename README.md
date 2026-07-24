@@ -9,13 +9,64 @@ We provide CB<sup>2</sup> as a R package, and the interal algorithms of CB<sup>2
 
 ## Update
 
+### Continuous and multivariable phenotypes
+
+Original CB<sup>2</sup> asks whether guide abundance differs between two
+groups. The additive CB<sup>2</sup>-Reg API asks whether guide abundance follows
+a quantitative or adjusted sample design. It preserves the original
+beta-binomial treatment of sequencing and between-library variation while
+replacing the group comparison with an R model matrix. Existing two-group
+functions are unchanged.
+
+Use CB<sup>2</sup>-Reg for dose, time, ordered phenotypes, batch or donor
+adjustment, interactions, and named contrasts:
+
+```r
+fit <- bbreg(
+  count = guide_count,
+  total = library_size,
+  formula = ~ scale(dose) + batch,
+  data = design
+)
+
+screen <- bb_screen(
+  counts = count_matrix,
+  totals = library_size,
+  data = design,
+  formula = ~ scale(dose) + batch,
+  term = "scale(dose)",
+  gene = guide_annotation$gene,
+  ncores = 4
+)
+```
+
+`bbreg()` fits a beta-binomial logit mean model and tests coefficients with a
+Student t reference based on sample-level residual degrees of freedom.
+`bb_contrast()` tests named linear contrasts, and `bb_screen()` applies the
+model guide by guide with Benjamini-Hochberg correction. Weighted IRLS
+cross-products and solves use the package's RcppArmadillo layer. See the
+`cb2-continuous-regression` vignette for a complete example.
+
+When a screen includes prespecified negative-control guides,
+`bb_calibrate_controls()` can estimate a conservative empirical-null scale
+from their t-statistic tail. It preserves raw inferential columns and does not
+change coefficient estimates.
+
+MAGeCK is kept external: use the official `mageck mle` executable for a
+negative-binomial sensitivity analysis with the same sample design.
+
+In short: use original CB<sup>2</sup> when the estimand is a two-condition
+difference; use CB<sup>2</sup>-Reg when the estimand is a coefficient or
+contrast; use a specialist model when the libraries are correlated partitions
+or repeated measurements that require an explicit joint likelihood.
+
 ### Oct 1, 2025
 
 Update the C++ dependency 
 
 ### Jun 7, 2022
 
-A bug fix regarding [#14](https://github.com/hyunhwan-jeong/CB2/issues/14). Thanks @DaneseAnna for reporting the issue.
+A bug fix regarding issue #14. Thanks @DaneseAnna for reporting the issue.
 
 ### Dec 4, 2020
 
@@ -28,16 +79,16 @@ install.packages("multtest")
 
 ### May 26, 2020
 
-* Regarding [#9](https://github.com/hyunhwan-jeong/CB2/issues/9), CB<sup>2</sup> now provides logFC of gene-level analysis with two different modes. The default option is the same as the previous version, and setting `logFC` parameter value of `measure_gene_stats` to `gene` will provide the `logFC` calculate by gene-level CPMs.
+* Regarding issue #9, CB<sup>2</sup> now provides logFC of gene-level analysis with two different modes. The default option is the same as the previous version, and setting `logFC` parameter value of `measure_gene_stats` to `gene` will provide the `logFC` calculate by gene-level CPMs.
 
 ### April 14, 2020
 
-* Regarding [#6](https://github.com/hyunhwan-jeong/CB2/issues/6), now users can use `join_count_and_design` function. 
+* Regarding issue #6, now users can use `join_count_and_design` function.
 
 ### December 16, 2019
 
-* Regarding [#4](https://github.com/hyunhwan-jeong/CB2/issues/4), CB<sup>2</sup> now supports gzipped FASTQ file.
-* Regarding [#5](https://github.com/hyunhwan-jeong/CB2/issues/5), `calc_mappability()` provide `total_reads` and `mapped_reads` columns.
+* Regarding issue #4, CB<sup>2</sup> now supports gzipped FASTQ file.
+* Regarding issue #5, `calc_mappability()` provide `total_reads` and `mapped_reads` columns.
 
 ### July 2, 2019 
 
