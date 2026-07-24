@@ -1,8 +1,8 @@
 ---
-title: "Continuous and multivariable phenotypes in CB2"
+title: "BARCS regression for continuous and multivariable CRISPR screens"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Continuous and multivariable phenotypes in CB2}
+  %\VignetteIndexEntry{BARCS regression for continuous and multivariable CRISPR screens}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -11,9 +11,10 @@ vignette: >
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-CB2's original `measure_sgrna_stats()` answers a two-group question. CB2-Reg
-answers a coefficient question: does guide abundance change with dose, time,
-an ordered phenotype, or an adjusted treatment effect?
+CB2's original `measure_sgrna_stats()` answers a two-group question. BARCS
+(Beta-binomial Analysis and Regression for CRISPR Screens) answers a
+coefficient question: does guide abundance change with dose, time, an ordered
+phenotype, or an adjusted treatment effect?
 
 The regression interface is additive and does not change the original
 workflow. It keeps guide count as the response and retains CB2's
@@ -48,7 +49,7 @@ plug-in value. Student t degrees of freedom do not formally propagate
 dispersion-estimation uncertainty, so small-sample calibration should be
 checked with simulations, phenotype permutations, or prespecified controls.
 
-| Feature | Original CB2 | CB2-Reg |
+| Feature | Original CB2 | BARCS |
 |---|---|---|
 | Design | Two group labels | Full-rank R model matrix |
 | Effect | Group difference | Conditional log-odds coefficient or contrast |

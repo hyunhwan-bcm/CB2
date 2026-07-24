@@ -61,7 +61,7 @@ Student t reference based on sample-level residual degrees of freedom.
 `bb_contrast()` tests named linear contrasts, and `bb_screen()` applies the
 model guide by guide with Benjamini-Hochberg correction. Weighted IRLS
 cross-products and solves use the package's RcppArmadillo layer. See the
-`cb2-continuous-regression` vignette for a complete example.
+`barcs-regression` vignette for a complete example.
 
 When a screen includes prespecified negative-control guides,
 `bb_calibrate_controls()` can estimate a conservative empirical-null scale
