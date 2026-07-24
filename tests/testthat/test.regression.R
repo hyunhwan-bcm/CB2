@@ -52,7 +52,7 @@ test_that("Rcpp weighted products agree with base R", {
   )
 })
 
-test_that("original CB2 is exactly a binary-design GLS contrast", {
+test_that("saturated GLS reproduces completed legacy CB2 summaries", {
   count_a <- matrix(c(74, 112, 91, 139), nrow = 1)
   total_a <- matrix(c(52000, 81000, 69000, 97000), nrow = 1)
   count_b <- matrix(c(128, 177, 164, 211), nrow = 1)

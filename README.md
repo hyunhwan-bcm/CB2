@@ -19,13 +19,20 @@ replacing the group comparison with an R model matrix. Existing two-group
 functions are unchanged.
 
 The relationship is methodological, not a claim that the two functions are
-numerically identical. Original CB<sup>2</sup> is exactly representable as a
-binary-design generalized least-squares contrast of its weighted group
-proportions. The default logit-scale regression statistic is first-order
-equivalent under local alternatives, but finite-sample results can differ
-because CB<sup>2</sup> estimates group-specific weights and uses
-Welch–Satterthwaite degrees of freedom, while `bbreg()` uses one guide-wise
-dispersion across the design and residual sample degrees of freedom.
+numerically identical. A saturated two-cell generalized least-squares
+calculation reproduces original CB<sup>2</sup> after its weighted group
+proportions and variances have already been computed. This is a legacy
+compatibility identity, not strict nesting of the default `bbreg()` estimator.
+Under common dispersion, local alternatives, and increasing numbers of
+independent libraries, the default logit-scale statistic is first-order
+equivalent. Increasing sequencing depth at fixed biological replication is not
+sufficient. Finite-sample results can differ because CB<sup>2</sup> estimates
+group-specific weights and uses Welch–Satterthwaite degrees of freedom, while
+`bbreg()` uses one guide-wise dispersion across the design and residual sample
+degrees of freedom. Its model-based covariance treats that dispersion estimate
+as a fixed plug-in value and does not formally propagate its uncertainty.
+Control-tail calibration requires all controls to share one residual degree of
+freedom, which is satisfied when every guide uses the same complete design.
 
 Use CB<sup>2</sup>-Reg for dose, time, ordered phenotypes, batch or donor
 adjustment, interactions, and named contrasts:

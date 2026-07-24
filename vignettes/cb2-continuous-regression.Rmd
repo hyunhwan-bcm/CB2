@@ -22,22 +22,31 @@ What changes is the mean model: a standard R formula can contain a continuous
 sample phenotype, adjustment variables, interactions, splines, or categorical
 contrasts.
 
-This is a precise statistical extension rather than an assertion that the
-default functions return the same number. If the original weighted group
+This is a statistical extension rather than an assertion that the default
+functions return the same number. If the completed original weighted group
 proportions are written as \(\widehat p_A\) and \(\widehat p_B\), with
-estimated variances \(V_A\) and \(V_B\), then a binary-design generalized
-least-squares model has coefficient vector
+estimated variances \(V_A\) and \(V_B\), then a saturated two-cell
+generalized least-squares representation has coefficient vector
 \[
 (\widehat p_A,\widehat p_B-\widehat p_A)^\top
 \]
 and slope variance \(V_A+V_B\). Its slope t statistic is therefore exactly the
-original CB2 statistic. On the logit scale, Taylor expansion around
+original CB2 statistic. This is a legacy summary-scale compatibility identity,
+not proof that default `bbreg()` strictly nests the old estimator. On the logit
+scale, Taylor expansion around
 \(p_A=p_B=p\) multiplies both the effect and standard error by
-\(\{p(1-p)\}^{-1}\), which cancels. Thus the logit statistic is first-order
-equivalent under local alternatives. In finite samples the estimators differ:
+\(\{p(1-p)\}^{-1}\), which cancels. Under common dispersion, local
+alternatives, and increasing numbers of independent biological libraries, the
+logit statistic is first-order equivalent. Increasing sequencing depth at
+fixed replication is not sufficient. In finite samples the estimators differ:
 original CB2 uses separate group weighting and Welch-style degrees of freedom;
 `bbreg()` estimates one guide-wise dispersion across the entire design and
 uses residual sample degrees of freedom.
+
+The model-based covariance treats the estimated guide dispersion as a fixed
+plug-in value. Student t degrees of freedom do not formally propagate
+dispersion-estimation uncertainty, so small-sample calibration should be
+checked with simulations, phenotype permutations, or prespecified controls.
 
 | Feature | Original CB2 | CB2-Reg |
 |---|---|---|
@@ -118,6 +127,9 @@ statistics to the corresponding Student t cutoff. It never reduces the
 standard errors by default, and retains the original inferential columns with
 a `raw_` prefix. This is a calibration tool, not a substitute for a repeated-
 measure or joint multinomial model when libraries are correlated.
+All finite control guides must share one residual degree of freedom, which
+holds when every guide is fitted with the same complete design. Heterogeneous
+guide designs require separate calibration strata or a different procedure.
 
 The coefficient is a log-odds change per predictor unit. Its t reference has
 sample-level residual degrees of freedom; read depth does not substitute for
