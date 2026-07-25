@@ -201,6 +201,12 @@ bbreg <- function(count, total, formula, data, maxit = 100L,
   standard_error <- sqrt(diag(covariance))
   statistic <- beta / standard_error
   p_value <- 2 * pt(-abs(statistic), df = df_residual)
+  if (!converged) {
+    covariance[] <- NA_real_
+    standard_error[] <- NA_real_
+    statistic[] <- NA_real_
+    p_value[] <- NA_real_
+  }
   coefficient_table <- cbind(
     estimate = beta,
     std_error = standard_error,
@@ -300,7 +306,9 @@ print.summary.bbreg <- function(x, digits = max(3L, getOption("digits") - 3L),
 #'   numeric vector whose names identify coefficients.
 #' @param null Null value for the contrast.
 #' @return A one-row data frame with estimate, standard error, t statistic,
-#'   degrees of freedom, and two-sided p-value.
+#'   degrees of freedom, and two-sided p-value. If the underlying fit did not
+#'   converge, the last-iterate contrast estimate is retained for diagnosis but
+#'   its standard error, statistic, and p-value are missing.
 #' @export
 bb_contrast <- function(object, contrast, null = 0) {
   if (!inherits(object, "bbreg")) {
@@ -322,6 +330,16 @@ bb_contrast <- function(object, contrast, null = 0) {
     .bb_stop("An unnamed contrast must have one value per coefficient.")
   }
   estimate <- drop(crossprod(contrast, object$coefficients))
+  if (!isTRUE(object$converged)) {
+    return(data.frame(
+      estimate = estimate,
+      std_error = NA_real_,
+      t_value = NA_real_,
+      df = NA_real_,
+      p_value = NA_real_,
+      row.names = NULL
+    ))
+  }
   standard_error <- sqrt(drop(t(contrast) %*% object$covariance %*% contrast))
   statistic <- (estimate - null) / standard_error
   data.frame(
@@ -347,7 +365,9 @@ bb_contrast <- function(object, contrast, null = 0) {
 #' @param ncores Number of forked workers on Unix-like systems. Windows uses
 #'   one worker.
 #' @param ... Additional arguments passed to `bbreg`.
-#' @return A data frame with one row per guide and Benjamini--Hochberg FDR.
+#' @return A data frame with one row per guide, Benjamini--Hochberg FDR,
+#'   convergence status, Pearson ratio, residual scale, and dispersion-boundary
+#'   status. Nonconverged fits have missing inferential columns.
 #' @export
 bb_screen <- function(counts, data, formula, term, totals = NULL,
                       guide = rownames(counts), gene = NULL,
@@ -398,7 +418,9 @@ bb_screen <- function(counts, data, formula, term, totals = NULL,
     if (sum(counts[i, ]) < min_total_count) {
       return(c(estimate = NA_real_, std_error = NA_real_,
                t_value = NA_real_, df = NA_real_, p_value = NA_real_,
-               rho = NA_real_, mean_cpm = mean(counts[i, ] / totals * 1e6),
+               rho = NA_real_, pearson_ratio = NA_real_, scale = NA_real_,
+               dispersion_boundary = NA_real_,
+               mean_cpm = mean(counts[i, ] / totals * 1e6),
                converged = 0))
     }
     fit <- tryCatch(
@@ -408,17 +430,22 @@ bb_screen <- function(counts, data, formula, term, totals = NULL,
     if (is.null(fit)) {
       return(c(estimate = NA_real_, std_error = NA_real_,
                t_value = NA_real_, df = NA_real_, p_value = NA_real_,
-               rho = NA_real_, mean_cpm = mean(counts[i, ] / totals * 1e6),
+               rho = NA_real_, pearson_ratio = NA_real_, scale = NA_real_,
+               dispersion_boundary = NA_real_,
+               mean_cpm = mean(counts[i, ] / totals * 1e6),
                converged = 0))
     }
     tab <- fit$coefficient_table[term, ]
     c(
-      estimate = tab[["estimate"]],
+      estimate = if (fit$converged) tab[["estimate"]] else NA_real_,
       std_error = tab[["std_error"]],
       t_value = tab[["t_value"]],
       df = tab[["df"]],
       p_value = tab[["p_value"]],
       rho = fit$rho,
+      pearson_ratio = fit$pearson / fit$df.residual,
+      scale = fit$scale,
+      dispersion_boundary = as.numeric(fit$dispersion_boundary),
       mean_cpm = mean(counts[i, ] / totals * 1e6),
       converged = as.numeric(fit$converged)
     )
@@ -430,7 +457,7 @@ bb_screen <- function(counts, data, formula, term, totals = NULL,
     statistics <- do.call(rbind, pieces)
   } else {
     statistics <- t(vapply(
-      seq_len(nrow(counts)), one_guide, numeric(8L)
+      seq_len(nrow(counts)), one_guide, numeric(11L)
     ))
   }
   result <- data.frame(
@@ -439,6 +466,7 @@ bb_screen <- function(counts, data, formula, term, totals = NULL,
     row.names = NULL,
     check.names = FALSE
   )
+  result$dispersion_boundary <- as.logical(result$dispersion_boundary)
   result$converged <- as.logical(result$converged)
   if (!is.null(gene)) {
     result <- cbind(gene = gene, result)
@@ -520,4 +548,202 @@ bb_calibrate_controls <- function(result, control, alpha = 0.05,
   attr(result, "control_scale") <- scale
   attr(result, "control_alpha") <- alpha
   result
+}
+
+#' Test a shared guide effect against an empirical gene-level null
+#'
+#' This function is intended for exploratory screens in which several
+#' independently designed guides target each gene but biological replication
+#' is too limited for reliable guide-level reference distributions. It does
+#' not treat guides as biological replicates. Instead, it estimates one shared
+#' gene effect by inverse-variance weighting of guide coefficients, forms its
+#' model-based Wald statistic, then calibrates the gene-statistic distribution
+#' with a robust empirical null. It does not combine guide p-values by Fisher's
+#' or Stouffer's method.
+#'
+#' For gene \eqn{g}, let
+#' \eqn{w_{gj}=\mathrm{SE}(\widehat\beta_{gj})^{-2}}.
+#' The shared effect and raw statistic are
+#' \deqn{\widehat\beta_g =
+#' \frac{\sum_j w_{gj}\widehat\beta_{gj}}{\sum_j w_{gj}},\qquad
+#' T_g = \widehat\beta_g\sqrt{\sum_jw_{gj}}.}
+#' Its null center is the median score among control genes when enough are
+#' supplied, and otherwise the median across all genes. The null scale is the
+#' largest of `min_scale`, the all-gene MAD, and the control-gene tail scale.
+#' The all-gene MAD assumes that fewer than half of genes are active.
+#'
+#' The inverse-variance standard error does not model dependence among guide
+#' coefficients induced by their shared sample libraries. Consequently,
+#' `p_value` and `fdr` are empirical-null working quantities for ranking and
+#' sensitivity analysis, not confirmatory error guarantees. Independently
+#' designed guides support perturbation consistency but do not replace
+#' independent biological samples.
+#'
+#' @param result A guide-level result from [bb_screen()]. If control
+#'   calibration has already been applied, the retained `raw_std_error`
+#'   column is used automatically. Nonconverged guides are excluded when a
+#'   `converged` column is present.
+#' @param control Optional non-missing logical vector identifying control
+#'   guides. A control gene must contain only control guides.
+#' @param min_guides Minimum number of finite guide scores required per gene.
+#' @param alpha Tail probability used to estimate the control-gene scale.
+#' @param min_control_genes Minimum number of valid control genes needed to
+#'   use their median and tail scale.
+#' @param min_scale Lower bound for the empirical-null scale.
+#' @return A data frame with one row per testable gene. `statistic` is the
+#'   empirical-null standardized gene score and `p_value` uses a standard
+#'   normal working reference. Null parameters are also stored as attributes.
+#' @export
+bb_gene_consistency <- function(result, control = NULL, min_guides = 3L,
+                                alpha = 0.05, min_control_genes = 10L,
+                                min_scale = 1) {
+  required <- c("gene", "estimate", "std_error")
+  if (!is.data.frame(result) || !all(required %in% names(result))) {
+    .bb_stop(
+      "`result` must contain guide-level `gene`, `estimate`, and `std_error` columns."
+    )
+  }
+  if (anyNA(result$gene)) {
+    .bb_stop("`result$gene` cannot contain missing values.")
+  }
+  if (length(min_guides) != 1L || !is.finite(min_guides) ||
+      min_guides < 2) {
+    .bb_stop("`min_guides` must be an integer of at least two.")
+  }
+  if (length(alpha) != 1L || !is.finite(alpha) ||
+      alpha <= 0 || alpha >= 0.5) {
+    .bb_stop("`alpha` must be one finite number between 0 and 0.5.")
+  }
+  if (length(min_control_genes) != 1L ||
+      !is.finite(min_control_genes) || min_control_genes < 2) {
+    .bb_stop("`min_control_genes` must be an integer of at least two.")
+  }
+  if (length(min_scale) != 1L || !is.finite(min_scale) ||
+      min_scale <= 0) {
+    .bb_stop("`min_scale` must be positive.")
+  }
+  min_guides <- as.integer(min_guides)
+  min_control_genes <- as.integer(min_control_genes)
+
+  if (is.null(control)) {
+    control <- rep(FALSE, nrow(result))
+  } else if (!is.logical(control) || length(control) != nrow(result) ||
+             anyNA(control)) {
+    .bb_stop("`control` must be a non-missing logical vector, one per guide.")
+  }
+  if ("converged" %in% names(result) &&
+      (!is.logical(result$converged) || anyNA(result$converged))) {
+    .bb_stop("`result$converged` must be a non-missing logical vector.")
+  }
+  control_by_gene <- split(control, result$gene)
+  mixed_control <- vapply(
+    control_by_gene,
+    function(value) any(value) && !all(value),
+    logical(1L)
+  )
+  if (any(mixed_control)) {
+    .bb_stop("A gene cannot mix control and non-control guides.")
+  }
+
+  standard_error <- if ("raw_std_error" %in% names(result)) {
+    result$raw_std_error
+  } else {
+    result$std_error
+  }
+  valid <- is.finite(result$estimate) &
+    is.finite(standard_error) &
+    standard_error > 0
+  if ("converged" %in% names(result)) {
+    valid <- valid & result$converged
+  }
+  groups <- split(seq_len(nrow(result)), result$gene)
+  pieces <- lapply(names(groups), function(gene_name) {
+    all_index <- groups[[gene_name]]
+    index <- all_index[valid[all_index]]
+    if (length(index) < min_guides) {
+      return(NULL)
+    }
+    guide_weight <- 1 / standard_error[index]^2
+    gene_estimate <- sum(
+      guide_weight * result$estimate[index]
+    ) / sum(guide_weight)
+    gene_standard_error <- sqrt(1 / sum(guide_weight))
+    nonzero <- result$estimate[index] != 0
+    agreement <- if (gene_estimate == 0 || !any(nonzero)) {
+      NA_real_
+    } else {
+      mean(
+        sign(result$estimate[index][nonzero]) == sign(gene_estimate)
+      )
+    }
+    data.frame(
+      gene = gene_name,
+      n_guides = length(index),
+      estimate = gene_estimate,
+      std_error = gene_standard_error,
+      raw_statistic = gene_estimate / gene_standard_error,
+      guide_direction_agreement = agreement,
+      converged_fraction = if ("converged" %in% names(result)) {
+        mean(result$converged[all_index])
+      } else {
+        NA_real_
+      },
+      control_gene = all(control[all_index]),
+      row.names = NULL
+    )
+  })
+  pieces <- Filter(Negate(is.null), pieces)
+  if (length(pieces) < 2L) {
+    .bb_stop("At least two genes must have enough finite guide scores.")
+  }
+  gene_result <- do.call(rbind, pieces)
+  rownames(gene_result) <- NULL
+
+  global_center <- stats::median(gene_result$raw_statistic)
+  global_scale <- stats::mad(
+    gene_result$raw_statistic,
+    center = global_center,
+    constant = 1 / stats::qnorm(0.75)
+  )
+  if (!is.finite(global_scale) || global_scale <= 0) {
+    global_scale <- 1
+  }
+
+  control_statistic <- gene_result$raw_statistic[
+    gene_result$control_gene
+  ]
+  enough_controls <- length(control_statistic) >= min_control_genes
+  null_center <- if (enough_controls) {
+    stats::median(control_statistic)
+  } else {
+    global_center
+  }
+  control_scale <- if (enough_controls) {
+    as.numeric(stats::quantile(
+      abs(control_statistic - null_center),
+      probs = 1 - alpha,
+      names = FALSE,
+      type = 8
+    )) / stats::qnorm(1 - alpha / 2)
+  } else {
+    NA_real_
+  }
+  scale_candidates <- c(min_scale, global_scale, control_scale)
+  null_scale <- max(scale_candidates[is.finite(scale_candidates)])
+
+  gene_result$statistic <-
+    (gene_result$raw_statistic - null_center) / null_scale
+  gene_result$p_value <- 2 * stats::pnorm(-abs(gene_result$statistic))
+  gene_result$fdr <- stats::p.adjust(gene_result$p_value, method = "BH")
+  attr(gene_result, "null_center") <- null_center
+  attr(gene_result, "null_scale") <- null_scale
+  attr(gene_result, "global_scale") <- global_scale
+  attr(gene_result, "control_scale") <- control_scale
+  attr(gene_result, "control_genes") <- length(control_statistic)
+  attr(gene_result, "null_assumption") <-
+    paste(
+      "Shared-effect guide-consistency empirical null;",
+      "not biological-replicate inference."
+    )
+  gene_result
 }

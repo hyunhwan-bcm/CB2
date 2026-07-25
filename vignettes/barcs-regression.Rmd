@@ -112,6 +112,11 @@ bb_result <- bb_screen(
 bb_result
 ```
 
+The screen output includes `converged`, `pearson_ratio`, `scale`, and
+`dispersion_boundary` diagnostics. A fit that does not converge remains
+visible with `converged = FALSE`, but its effect estimate, standard error,
+test statistic, p-value, and FDR are missing rather than being interpreted.
+
 If the library contains at least 20 prespecified negative-control guides, use
 them to diagnose and, when necessary, scale an inflated t-statistic tail:
 
@@ -128,9 +133,31 @@ statistics to the corresponding Student t cutoff. It never reduces the
 standard errors by default, and retains the original inferential columns with
 a `raw_` prefix. This is a calibration tool, not a substitute for a repeated-
 measure or joint multinomial model when libraries are correlated.
+The controls used to estimate the scale cannot also provide an independent
+calibration check; assess nominal tail frequencies with held-out controls,
+cross-fitting, or phenotype permutations.
 All finite control guides must share one residual degree of freedom, which
 holds when every guide is fitted with the same complete design. Heterogeneous
 guide designs require separate calibration strata or a different procedure.
+
+When an irreplaceable screen has only one biological replicate per condition,
+multiple guides still do not create biological replication. For exploratory
+hypothesis ranking, `bb_gene_consistency()` asks the narrower question of
+whether independently designed guides support a shared gene coefficient:
+
+```{r, eval=FALSE}
+gene_result <- bb_gene_consistency(
+  bb_result,
+  control = guide_annotation$gene == "Non-Targeting Control"
+)
+```
+
+It inverse-variance weights guide coefficients and calibrates the resulting
+gene-score distribution with a robust empirical null; it does not combine
+guide p-values by Fisher or Stouffer. Shared sample libraries can induce
+dependence among guide coefficients that the model-based standard error does
+not capture. Its p-values and FDR are therefore exploratory working quantities,
+not confirmatory error guarantees.
 
 The coefficient is a log-odds change per predictor unit. Its t reference has
 sample-level residual degrees of freedom; read depth does not substitute for

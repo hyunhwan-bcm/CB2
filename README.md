@@ -12,7 +12,7 @@ We provide CB<sup>2</sup> as a R package, and the interal algorithms of CB<sup>2
 ### Continuous and multivariable phenotypes
 
 Original CB<sup>2</sup> asks whether guide abundance differs between two
-groups. The additive CB<sup>2</sup>-Reg API asks whether guide abundance follows
+groups. The additive BARCS API asks whether guide abundance follows
 a quantitative or adjusted sample design. It preserves the original
 beta-binomial treatment of sequencing and between-library variation while
 replacing the group comparison with an R model matrix. Existing two-group
@@ -63,16 +63,40 @@ model guide by guide with Benjamini-Hochberg correction. Weighted IRLS
 cross-products and solves use the package's RcppArmadillo layer. See the
 `barcs-regression` vignette for a complete example.
 
+Guide-level output includes convergence status, the Pearson ratio, residual
+scale, and a dispersion-boundary flag. A fit that exhausts its iteration
+budget is retained as a visible diagnostic failure but cannot contribute a
+standard error, test statistic, p-value, or screen-level effect estimate.
+
 When a screen includes prespecified negative-control guides,
 `bb_calibrate_controls()` can estimate a conservative empirical-null scale
 from their t-statistic tail. It preserves raw inferential columns and does not
-change coefficient estimates.
+change coefficient estimates. Assessing calibration on the same controls used
+to estimate that scale is circular; use held-out controls, cross-fitting, or
+phenotype permutations for a calibration diagnostic.
+
+For a one-replicate boundary case, `bb_gene_consistency()` can rank genes whose
+independently designed guides support a shared coefficient:
+
+```r
+gene_result <- bb_gene_consistency(
+  screen,
+  control = guide_annotation$gene == "Non-Targeting Control"
+)
+```
+
+The function inverse-variance weights guide coefficients and calibrates their
+gene scores against a robust empirical null. It does not combine guide
+p-values by Fisher or Stouffer and does not treat guides as biological
+replicates. Because shared libraries can correlate guide coefficients, its
+p-values and FDR are exploratory working quantities rather than confirmatory
+error guarantees.
 
 MAGeCK is kept external: use the official `mageck mle` executable for a
 negative-binomial sensitivity analysis with the same sample design.
 
 In short: use original CB<sup>2</sup> when the estimand is a two-condition
-difference; use CB<sup>2</sup>-Reg when the estimand is a coefficient or
+difference; use BARCS when the estimand is a coefficient or
 contrast; use a specialist model when the libraries are correlated partitions
 or repeated measurements that require an explicit joint likelihood.
 

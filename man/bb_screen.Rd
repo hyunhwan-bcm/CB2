@@ -40,7 +40,9 @@ one worker.}
 \item{...}{Additional arguments passed to `bbreg`.}
 }
 \value{
-A data frame with one row per guide and Benjamini--Hochberg FDR.
+A data frame with one row per guide, Benjamini--Hochberg FDR,
+  convergence status, Pearson ratio, residual scale, and dispersion-boundary
+  status. Nonconverged fits have missing inferential columns.
 }
 \description{
 Apply beta-binomial regression guide by guide

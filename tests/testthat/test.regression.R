@@ -92,6 +92,12 @@ test_that("bb_screen preserves guide and gene annotation", {
   )
   expect_equal(nrow(result), 3)
   expect_equal(result$gene, c("gene1", "gene1", "gene2"))
+  expect_true(all(c(
+    "pearson_ratio", "scale", "dispersion_boundary", "converged"
+  ) %in% names(result)))
+  expect_type(result$dispersion_boundary, "logical")
+  expect_true(all(is.finite(result$pearson_ratio[result$converged])))
+  expect_true(all(is.finite(result$scale[result$converged])))
   expect_true(all(result$fdr >= 0 & result$fdr <= 1, na.rm = TRUE))
 })
 
@@ -119,6 +125,109 @@ test_that("negative-control calibration preserves raw inference", {
     abs(mean(calibrated$p_value[seq_len(100)] < 0.05) - 0.05),
     0.02
   )
+})
+
+test_that("guide-consistency scores expose their exploratory empirical null", {
+  consistency_input <- data.frame(
+    gene = rep(c("control_a", "control_b", "null", "signal"), each = 5),
+    estimate = c(
+      -0.08, -0.04, 0, 0.04, 0.08,
+      -0.10, -0.05, 0, 0.05, 0.10,
+      -0.05, -0.02, 0.01, 0.04, 0.02,
+      0.58, 0.62, 0.65, 0.68, 0.72
+    ),
+    std_error = rep(0.10, 20),
+    converged = TRUE
+  )
+  control <- consistency_input$gene %in% c("control_a", "control_b")
+  result <- bb_gene_consistency(
+    consistency_input,
+    control = control,
+    min_control_genes = 2
+  )
+
+  expect_equal(nrow(result), 4)
+  expect_true(all(c(
+    "raw_statistic", "statistic", "guide_direction_agreement",
+    "converged_fraction", "control_gene", "p_value", "fdr"
+  ) %in% names(result)))
+  expect_gte(attr(result, "null_scale"), 1)
+  expect_equal(attr(result, "control_genes"), 2)
+  expect_lt(
+    result$p_value[result$gene == "signal"],
+    result$p_value[result$gene == "null"]
+  )
+  expect_equal(
+    result$guide_direction_agreement[result$gene == "signal"],
+    1
+  )
+  expect_match(
+    attr(result, "null_assumption"),
+    "not biological-replicate inference",
+    fixed = TRUE
+  )
+})
+
+test_that("guide-consistency excludes failed fits and uses raw uncertainty", {
+  result <- data.frame(
+    gene = rep(c("control_a", "control_b", "signal"), each = 5),
+    estimate = c(
+      -0.08, -0.04, 0, 0.04, 0.08,
+      -0.10, -0.05, 0, 0.05, 0.10,
+      -10, 0.60, 0.60, 0.60, 0.60
+    ),
+    std_error = rep(0.30, 15),
+    raw_std_error = rep(0.10, 15),
+    converged = c(rep(TRUE, 10), FALSE, rep(TRUE, 4))
+  )
+  control <- result$gene %in% c("control_a", "control_b")
+  gene_result <- bb_gene_consistency(
+    result,
+    control = control,
+    min_control_genes = 2
+  )
+
+  signal <- gene_result[gene_result$gene == "signal", ]
+  expect_equal(signal$n_guides, 4)
+  expect_equal(signal$converged_fraction, 0.8)
+  expect_equal(signal$estimate, 0.60, tolerance = 1e-12)
+  expect_equal(signal$std_error, 0.05, tolerance = 1e-12)
+})
+
+test_that("nonconverged fits cannot produce inferential results", {
+  fit <- bbreg(
+    count, total, ~ dose, sample_data,
+    maxit = 1L,
+    tolerance = 1e-300
+  )
+  expect_false(fit$converged)
+  expect_true(all(is.na(fit$coefficient_table[
+    , c("std_error", "t_value", "p_value")
+  ])))
+  expect_true(all(is.na(vcov(fit))))
+
+  contrast <- bb_contrast(fit, c(dose = 1))
+  expect_true(is.finite(contrast$estimate))
+  expect_true(all(is.na(contrast[
+    , c("std_error", "t_value", "df", "p_value")
+  ])))
+
+  screen <- bb_screen(
+    rbind(guide_a = count),
+    totals = total,
+    data = sample_data,
+    formula = ~ dose,
+    term = "dose",
+    maxit = 1L,
+    tolerance = 1e-300
+  )
+  expect_false(screen$converged)
+  expect_true(all(is.na(screen[
+    , c("estimate", "std_error", "t_value", "p_value", "fdr")
+  ])))
+  expect_true(all(c(
+    "pearson_ratio", "scale", "dispersion_boundary"
+  ) %in% names(screen)))
 })
 
 test_that("regression input errors are informative", {

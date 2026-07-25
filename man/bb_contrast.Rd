@@ -16,7 +16,9 @@ numeric vector whose names identify coefficients.}
 }
 \value{
 A one-row data frame with estimate, standard error, t statistic,
-  degrees of freedom, and two-sided p-value.
+  degrees of freedom, and two-sided p-value. If the underlying fit did not
+  converge, the last-iterate contrast estimate is retained for diagnosis but
+  its standard error, statistic, and p-value are missing.
 }
 \description{
 Test a linear contrast of beta-binomial regression coefficients
